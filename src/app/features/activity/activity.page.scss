@@ -1,0 +1,20 @@
+.page { max-width: 900px; margin: 0 auto; display: grid; gap: 1rem; }
+h1 { margin: 0; font-size: 1.3rem; }
+.inline select { width: auto; }
+.standup p { margin: 0; }
+.summary { font-size: 1rem; margin-bottom: 0.75rem !important; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 0.75rem; }
+.cols h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cols h2.blockers { color: var(--bad); }
+.cols ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; overflow-wrap: anywhere; }
+.day { margin: 1rem 0 0.35rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.log { list-style: none; margin: 0; padding: 0; display: grid; }
+.log li { display: flex; gap: 0.6rem; align-items: baseline; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
+.time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.8rem; flex: none; width: 3.2rem; }
+.kind { width: 0.55rem; height: 0.55rem; border-radius: 50%; flex: none; background: var(--muted); align-self: center; }
+.kind[data-k='created'] { background: var(--s1); }
+.kind[data-k='moved'] { background: var(--accent); }
+.kind[data-k='deleted'] { background: var(--bad); }
+.kind[data-k='commented'] { background: var(--s5); }
+.kind[data-k='checklist'] { background: var(--good); }
+.text { min-width: 0; overflow-wrap: anywhere; }

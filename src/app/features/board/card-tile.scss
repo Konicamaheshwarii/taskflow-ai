@@ -1,0 +1,57 @@
+:host {
+  display: grid;
+  gap: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.65rem;
+  box-shadow: var(--shadow);
+  cursor: grab;
+  touch-action: manipulation;
+}
+:host(:focus-within) { border-color: var(--accent); }
+:host(.cdk-drag-preview) { cursor: grabbing; }
+
+.labels { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  line-height: 1.6;
+}
+
+.head { display: flex; align-items: flex-start; gap: 0.25rem; }
+.title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  &:hover { color: var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+}
+.more { margin: -0.2rem -0.3rem 0 0; color: var(--muted); }
+
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--muted); }
+.pill, .due, .prio {
+  padding: 0 0.4rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  line-height: 1.7;
+  white-space: nowrap;
+}
+.pill.complete { color: var(--good); }
+.due.overdue { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); font-weight: 700; }
+.due.soon { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.prio { text-transform: capitalize; color: var(--warn); font-weight: 700; }
+.prio.urgent { color: var(--bad); }
+.spacer { flex: 1; }

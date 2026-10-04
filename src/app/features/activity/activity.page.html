@@ -1,0 +1,71 @@
+<div class="page">
+  <section class="card stack standup" aria-labelledby="standup-title">
+    <div class="row">
+      <h1 id="standup-title">Standup summary</h1>
+      <span class="spacer"></span>
+      <label class="inline">
+        <span class="sr-only">Time window</span>
+        <select (change)="hours.set(+value($event))">
+          @for (w of windows; track w.h) { <option [value]="w.h" [selected]="hours() === w.h">{{ w.label }}</option> }
+        </select>
+      </label>
+      <button class="btn primary" type="button" (click)="generate()" [disabled]="standup().status === 'loading' || !board.board() || settings.needsKey()">
+        @if (standup().status === 'loading') { <span class="spinner" aria-hidden="true"></span> Writing… } @else { ✦ Generate }
+      </button>
+    </div>
+    <p class="muted small">Built from the activity log of <strong>{{ board.board()?.name }}</strong>: what moved, what is in progress, and what is overdue or over a WIP limit.</p>
+    @if (settings.needsKey()) { <p class="muted small">Add an API key in <a routerLink="/settings">Settings</a>, or switch to Demo mode.</p> }
+    @if (standup().error) { <p class="alert" role="alert">{{ standup().error }}</p> }
+    @if (standup().result; as r) {
+      <div class="result" aria-live="polite">
+        <p class="summary">{{ r.summary }}</p>
+        <div class="cols">
+          <div>
+            <h2>Done</h2>
+            <ul>@for (i of r.done; track $index) { <li>{{ i }}</li> } @empty { <li class="muted">Nothing finished.</li> }</ul>
+          </div>
+          <div>
+            <h2>In progress</h2>
+            <ul>@for (i of r.inProgress; track $index) { <li>{{ i }}</li> } @empty { <li class="muted">Nothing in progress.</li> }</ul>
+          </div>
+          <div>
+            <h2 class="blockers">Blockers</h2>
+            <ul>@for (i of r.blockers; track $index) { <li>{{ i }}</li> } @empty { <li class="muted">No blockers.</li> }</ul>
+          </div>
+        </div>
+        <button class="btn sm" type="button" (click)="copy()">Copy as text</button>
+      </div>
+    }
+  </section>
+
+  <section class="card" aria-labelledby="log-title">
+    <h2 id="log-title">Activity log</h2>
+    @for (g of days(); track g.day) {
+      <h3 class="day">{{ g.label }}</h3>
+      <ol class="log">
+        @for (e of g.events; track e.id) {
+          <li>
+            <span class="time">{{ time(e.at) }}</span>
+            <span class="kind" [attr.data-k]="e.kind" aria-hidden="true"></span>
+            <span class="text">
+              <strong>{{ e.cardTitle }}</strong>
+              @switch (e.kind) {
+                @case ('created') { added to {{ column(e.toColumnId) }} }
+                @case ('moved') { moved {{ column(e.fromColumnId) }} → {{ column(e.toColumnId) }} }
+                @case ('deleted') { deleted }
+                @case ('commented') { comment: “{{ e.detail }}” }
+                @case ('checklist') { checklist: {{ e.detail }} }
+                @default { updated {{ e.detail }} }
+              }
+            </span>
+          </li>
+        }
+      </ol>
+    } @empty {
+      <p class="muted">No activity yet. Changes to cards appear here.</p>
+    }
+    @if (board.activity().length > limit()) {
+      <button class="btn sm" type="button" (click)="limit.set(limit() + 100)">Show more</button>
+    }
+  </section>
+</div>

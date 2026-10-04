@@ -1,0 +1,73 @@
+<div class="page">
+  <header>
+    <h1>Plan a sprint</h1>
+    <p class="muted">Paste a goal or a short spec. TaskFlow drafts an epic with user stories, acceptance criteria and estimates. Review it, then create the stories as cards on <strong>{{ board.board()?.name ?? 'your board' }}</strong>.</p>
+  </header>
+
+  <section class="card stack">
+    <label for="goal">Goal or spec</label>
+    <textarea id="goal" rows="6" [value]="goal()" (input)="goal.set(value($event))"
+              placeholder="e.g. Let customers pay by card at checkout, get a receipt, and let support issue refunds."></textarea>
+    <div class="row">
+      <span class="muted small">Try:</span>
+      @for (e of examples; track e.label) {
+        <button class="btn sm ghost example" type="button" (click)="goal.set(e.goal)">{{ e.label }}</button>
+      }
+      <span class="spacer"></span>
+      <button class="btn primary" type="button" (click)="plan()" [disabled]="!goal().trim() || sprint().status === 'loading' || settings.needsKey()">
+        @if (sprint().status === 'loading') { <span class="spinner" aria-hidden="true"></span> Planning… } @else { ✦ Plan sprint }
+      </button>
+    </div>
+    @if (settings.needsKey()) { <p class="muted small">Add an API key in <a routerLink="/settings">Settings</a>, or switch to Demo mode.</p> }
+    @if (sprint().error) { <p class="alert" role="alert">{{ sprint().error }}</p> }
+  </section>
+
+  @if (created(); as n) {
+    <p class="success" role="status">Created {{ n }} cards. <a routerLink="/">Open the board</a></p>
+  }
+
+  @if (sprint().plan; as p) {
+    <section class="card stack" aria-labelledby="epic-title">
+      <div>
+        <span class="chip">Epic</span>
+        <h2 id="epic-title" class="epic">{{ p.epic.title }}</h2>
+        @if (p.epic.summary) { <p class="muted">{{ p.epic.summary }}</p> }
+      </div>
+      <ul class="stories">
+        @for (s of p.stories; track $index; let i = $index) {
+          <li class="story" [class.off]="!selected().has(i)">
+            <label class="pick">
+              <input type="checkbox" [checked]="selected().has(i)" (change)="toggle(i)" />
+              <span class="sr-only">Include {{ s.title }}</span>
+            </label>
+            <div class="body">
+              <div class="row">
+                <h3>{{ s.title }}</h3>
+                <span class="spacer"></span>
+                <span class="pts">{{ s.points }} pt</span>
+                <span class="prio" [attr.data-p]="s.priority">{{ s.priority }}</span>
+              </div>
+              <p>{{ s.description }}</p>
+              @if (s.acceptanceCriteria.length) {
+                <ul class="ac">
+                  @for (a of s.acceptanceCriteria; track $index) { <li>{{ a }}</li> }
+                </ul>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+      <div class="row footer">
+        <label class="inline">Add to
+          <select (change)="targetColumn.set(value($event))">
+            @for (c of board.columns(); track c.id) { <option [value]="c.id" [selected]="c.id === targetColumn()">{{ c.name }}</option> }
+          </select>
+        </label>
+        <span class="muted small">{{ selected().size }} stories · {{ selectedPoints() }} points</span>
+        <span class="spacer"></span>
+        <button class="btn ghost" type="button" (click)="reset()">Discard</button>
+        <button class="btn primary" type="button" (click)="create()" [disabled]="!selected().size || !board.board()">Create {{ selected().size }} cards</button>
+      </div>
+    </section>
+  }
+</div>

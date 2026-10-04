@@ -1,0 +1,169 @@
+@if (card(); as c) {
+  <div class="dialog">
+    <header class="dlg-head">
+      <div class="title-wrap">
+        <h2 class="sr-only">{{ c.title }}</h2>
+        <label class="sr-only" for="card-title">Title</label>
+        <input id="card-title" class="title" type="text" [value]="c.title" (change)="setTitle(value($event))" (keydown.enter)="$any($event.target).blur()" />
+        <p class="muted small">
+          in <strong>{{ column()?.name }}</strong> · created {{ ago(c.createdAt) }} · updated {{ ago(c.updatedAt) }}
+        </p>
+      </div>
+      <button class="btn ghost icon" type="button" (click)="close()" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+
+    <div class="layout">
+      <div class="main stack">
+        <section>
+          <div class="row sec-head">
+            <h3>Description</h3>
+            <span class="spacer"></span>
+            @if (!editingDescription()) {
+              <button class="btn sm ghost" type="button" (click)="editingDescription.set(true)">Edit</button>
+            }
+          </div>
+          @if (editingDescription()) {
+            <label class="sr-only" for="desc">Description (Markdown)</label>
+            <textarea id="desc" #desc rows="7" appAutofocus [value]="c.description"
+                      placeholder="Markdown supported: **bold**, *italic*, lists, `code`, [links](https://…)"></textarea>
+            <div class="row">
+              <button class="btn primary sm" type="button" (click)="saveDescription(desc.value)">Save</button>
+              <button class="btn sm" type="button" (click)="editingDescription.set(false)">Cancel</button>
+              <span class="muted small">Markdown supported</span>
+            </div>
+          } @else if (c.description.trim()) {
+            <div class="md" [innerHTML]="html()"></div>
+          } @else {
+            <button class="placeholder" type="button" (click)="editingDescription.set(true)">Add a description…</button>
+          }
+        </section>
+
+        <section class="ai">
+          <div class="row sec-head">
+            <h3>Break down with AI</h3>
+            <span class="spacer"></span>
+            <button class="btn sm primary" type="button" (click)="breakDown()" [disabled]="mine()?.status === 'loading' || settings.needsKey()">
+              @if (mine()?.status === 'loading') { <span class="spinner" aria-hidden="true"></span> Thinking… } @else { ✦ Break down }
+            </button>
+          </div>
+          @if (settings.needsKey()) { <p class="muted small">Add an API key in Settings, or switch to Demo mode.</p> }
+          @if (!mine()) {
+            <p class="muted small">Turn this card's goal into 4-8 estimated subtasks, then add them as a checklist or as new cards.</p>
+          }
+          @if (mine(); as r) {
+            @if (r.status === 'error') { <p class="alert" role="alert">{{ r.error }}</p> }
+            @if (r.status === 'done') {
+              <ol class="subtasks">
+                @for (s of r.subtasks; track $index) {
+                  <li><span>{{ s.title }}</span><span class="hours">{{ s.estimateHours }}h</span></li>
+                }
+              </ol>
+              <p class="muted small">{{ r.subtasks.length }} subtasks · about {{ totalHours() }} hours</p>
+              <div class="row">
+                <button class="btn sm primary" type="button" (click)="acceptAsChecklist()">Add as checklist</button>
+                <button class="btn sm" type="button" (click)="acceptAsCards()">Add as {{ r.subtasks.length }} cards</button>
+                <button class="btn sm ghost" type="button" (click)="discard()">Discard</button>
+              </div>
+            }
+          }
+        </section>
+
+        <section>
+          <div class="row sec-head">
+            <h3>Checklist</h3>
+            @if (progress().total) { <span class="muted small">{{ progress().done }}/{{ progress().total }}</span> }
+          </div>
+          @if (progress().total) {
+            <div class="bar" role="progressbar" aria-label="Checklist progress" [attr.aria-valuenow]="progress().done" aria-valuemin="0" [attr.aria-valuemax]="progress().total">
+              <span [style.width.%]="(100 * progress().done) / progress().total"></span>
+            </div>
+          }
+          <ul class="checklist">
+            @for (i of c.checklist; track i.id) {
+              <li [class.done]="i.done">
+                <label class="check">
+                  <input type="checkbox" [checked]="i.done" (change)="board.toggleChecklistItem(c.id, i.id)" />
+                  <span>{{ i.text }}</span>
+                </label>
+                <button class="btn ghost icon sm" type="button" (click)="board.removeChecklistItem(c.id, i.id)" [attr.aria-label]="'Remove ' + i.text">✕</button>
+              </li>
+            }
+          </ul>
+          <form class="row nowrap" (submit)="$event.preventDefault(); addItem(item)">
+            <label class="sr-only" for="new-item">New checklist item</label>
+            <input #item id="new-item" type="text" placeholder="Add an item" />
+            <button class="btn sm" type="submit">Add</button>
+          </form>
+        </section>
+
+        <section>
+          <h3>Comments</h3>
+          <ul class="comments">
+            @for (m of c.comments; track m.id) {
+              <li>
+                <span class="avatar" [style.background]="m.authorId ? board.memberMap()[m.authorId]?.color : 'var(--muted)'" aria-hidden="true">
+                  {{ init(memberName(m.authorId)) }}
+                </span>
+                <div>
+                  <p class="small"><strong>{{ memberName(m.authorId) }}</strong> <span class="muted">· {{ ago(m.at) }}</span></p>
+                  <p class="comment-text">{{ m.text }}</p>
+                </div>
+              </li>
+            } @empty { <li class="muted small">No comments yet.</li> }
+          </ul>
+          <form class="stack comment-form" (submit)="$event.preventDefault(); addComment(comment)">
+            <label class="sr-only" for="new-comment">Comment</label>
+            <textarea #comment id="new-comment" rows="2" placeholder="Write a comment"></textarea>
+            <div class="row">
+              <label class="inline">As
+                <select (change)="commentAuthor.set(value($event) || null)">
+                  <option value="">Me</option>
+                  @for (m of board.members(); track m.id) { <option [value]="m.id">{{ m.name }}</option> }
+                </select>
+              </label>
+              <button class="btn sm primary" type="submit">Comment</button>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <aside class="side stack">
+        <label>Column
+          <select (change)="moveTo(value($event))">
+            @for (col of board.columns(); track col.id) { <option [value]="col.id" [selected]="col.id === c.columnId">{{ col.name }}</option> }
+          </select>
+        </label>
+        <label>Assignee
+          <select (change)="setAssignee(value($event))">
+            <option value="" [selected]="!c.assigneeId">Unassigned</option>
+            @for (m of board.members(); track m.id) { <option [value]="m.id" [selected]="c.assigneeId === m.id">{{ m.name }}</option> }
+          </select>
+        </label>
+        <label>Priority
+          <select (change)="setPriority(value($event))">
+            @for (p of priorities; track p) { <option [value]="p" [selected]="c.priority === p">{{ p }}</option> }
+          </select>
+        </label>
+        <label>Due date
+          <input type="date" [value]="c.due ?? ''" (change)="setDue(value($event))" />
+        </label>
+        <label>Estimate (points)
+          <input type="number" min="0" step="1" [value]="c.estimate ?? ''" (change)="setEstimate(value($event))" />
+        </label>
+        <fieldset class="labels">
+          <legend>Labels</legend>
+          @for (l of board.labels(); track l.id) {
+            <label class="check">
+              <input type="checkbox" [checked]="c.labelIds.includes(l.id)" (change)="toggleLabel(l.id)" />
+              <span class="dot" [style.background]="l.color" aria-hidden="true"></span>{{ l.name }}
+            </label>
+          }
+        </fieldset>
+        <button class="btn danger" type="button" (click)="deleteCard()">Delete card</button>
+        <p class="muted small">Every change can be undone with Ctrl+Z.</p>
+      </aside>
+    </div>
+  </div>
+}

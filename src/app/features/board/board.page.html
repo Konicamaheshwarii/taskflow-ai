@@ -1,0 +1,200 @@
+@if (board.board(); as b) {
+  <div class="toolbar">
+    @if (renaming()) {
+      <form class="row inline-form" (submit)="$event.preventDefault(); renameBoard(b.id, nameInput.value)">
+        <label class="sr-only" for="board-name">Board name</label>
+        <input #nameInput id="board-name" type="text" appAutofocus [value]="b.name" (keydown.escape)="renaming.set(false)" />
+        <button class="btn primary sm" type="submit">Save</button>
+        <button class="btn sm" type="button" (click)="renaming.set(false)">Cancel</button>
+      </form>
+    } @else if (creatingBoard()) {
+      <form class="row inline-form" (submit)="$event.preventDefault(); newBoard(newName.value)">
+        <label class="sr-only" for="new-board">New board name</label>
+        <input #newName id="new-board" type="text" appAutofocus placeholder="Board name" (keydown.escape)="creatingBoard.set(false)" />
+        <button class="btn primary sm" type="submit">Create</button>
+        <button class="btn sm" type="button" (click)="creatingBoard.set(false)">Cancel</button>
+      </form>
+    } @else {
+      <label class="sr-only" for="board-select">Board</label>
+      <select id="board-select" class="board-select" [value]="b.id" (change)="board.selectBoard(value($event)); ui.clearFilters()">
+        @for (o of board.boards(); track o.id) { <option [value]="o.id" [selected]="o.id === b.id">{{ o.name }}</option> }
+      </select>
+      <button class="btn sm" type="button" [cdkMenuTriggerFor]="boardMenu" aria-label="Board actions">Board ▾</button>
+      <button class="btn sm primary" type="button" (click)="creatingBoard.set(true)">+ New board</button>
+    }
+    <span class="spacer"></span>
+    <span class="muted small" aria-live="polite">
+      @if (ui.filterActive()) { Showing {{ totals().shown }} of {{ totals().all }} cards } @else { {{ totals().all }} cards }
+    </span>
+  </div>
+
+  <ng-template #boardMenu>
+    <div class="menu" cdkMenu>
+      <button class="menu-item" cdkMenuItem (cdkMenuItemTriggered)="renaming.set(true)">Rename board</button>
+      <button class="menu-item" cdkMenuItem (cdkMenuItemTriggered)="addColumn()">Add column</button>
+      <div class="menu-sep" role="separator"></div>
+      <button class="menu-item danger" cdkMenuItem [disabled]="board.boards().length < 2" (cdkMenuItemTriggered)="deleteBoard(b.id, b.name)">Delete board</button>
+    </div>
+  </ng-template>
+
+  <div class="filters" role="search" aria-label="Filter cards">
+    <label class="search">
+      <span class="sr-only">Search cards</span>
+      <input type="search" placeholder="Search cards…" [value]="ui.filter().query" (input)="ui.setQuery(value($event))" />
+    </label>
+    <label>
+      <span class="sr-only">Assignee</span>
+      <select [value]="ui.filter().assigneeId ?? ''" (change)="ui.setAssignee(value($event) || null)">
+        <option value="" [selected]="!ui.filter().assigneeId">Everyone</option>
+        @for (m of board.members(); track m.id) { <option [value]="m.id" [selected]="ui.filter().assigneeId === m.id">{{ m.name }}</option> }
+        <option value="unassigned" [selected]="ui.filter().assigneeId === 'unassigned'">Unassigned</option>
+      </select>
+    </label>
+    <label>
+      <span class="sr-only">Due date</span>
+      <select (change)="ui.setDue($any(value($event)))">
+        @for (d of dueOptions; track d.id) { <option [value]="d.id" [selected]="ui.filter().due === d.id">{{ d.label }}</option> }
+      </select>
+    </label>
+    <div class="label-filter" role="group" aria-label="Labels">
+      @for (l of board.labels(); track l.id) {
+        <button type="button" class="label-chip" [style.--c]="l.color" [class.on]="ui.filter().labelIds.includes(l.id)"
+                [attr.aria-pressed]="ui.filter().labelIds.includes(l.id)" (click)="ui.toggleLabel(l.id)">{{ l.name }}</button>
+      }
+    </div>
+    <span class="spacer"></span>
+    @if (ui.filterActive()) { <button class="btn sm ghost" type="button" (click)="ui.clearFilters()">Clear filters</button> }
+    <button class="btn sm" type="button" [class.primary]="ui.swimlanes()" [attr.aria-pressed]="ui.swimlanes()" (click)="ui.toggleSwimlanes()">
+      Swimlanes by assignee
+    </button>
+  </div>
+
+  @if (!ui.swimlanes()) {
+    <div class="board-scroll">
+      <div class="board" cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="dropColumn($event)">
+        @for (v of columns(); track v.column.id; let ci = $index, cfirst = $first, clast = $last) {
+          <section class="column" cdkDrag [cdkDragData]="v.column.id" cdkDragLockAxis="x" [attr.aria-labelledby]="'col-' + v.column.id"
+                   [class.wip-at]="v.wip === 'at'" [class.wip-over]="v.wip === 'over'">
+            @if (editing() === v.column.id) {
+              <form class="col-edit" (submit)="$event.preventDefault(); saveColumn(v.column, cname.value, cwip.value, crole.value)">
+                <label>Name <input #cname type="text" appAutofocus [value]="v.column.name" /></label>
+                <div class="row nowrap">
+                  <label>WIP limit <input #cwip type="number" min="1" [value]="v.column.wipLimit ?? ''" placeholder="None" /></label>
+                  <label>Stage
+                    <select #crole>
+                      @for (r of roles; track r.id) { <option [value]="r.id" [selected]="v.column.role === r.id">{{ r.label }}</option> }
+                    </select>
+                  </label>
+                </div>
+                <div class="row">
+                  <button class="btn primary sm" type="submit">Save</button>
+                  <button class="btn sm" type="button" (click)="editing.set(null)">Cancel</button>
+                </div>
+              </form>
+            } @else {
+              <header class="col-head" cdkDragHandle>
+                <h2 [id]="'col-' + v.column.id">{{ v.column.name }}</h2>
+                <span class="count" [class.at]="v.wip === 'at'" [class.over]="v.wip === 'over'"
+                      [title]="v.column.wipLimit === null ? 'Cards' : 'Cards / WIP limit'">
+                  {{ wipText(v.cards.length, v.column.wipLimit) }}
+                </span>
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost icon" [cdkMenuTriggerFor]="colMenu" [attr.aria-label]="'Actions for column ' + v.column.name"
+                        (pointerdown)="$event.stopPropagation()">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>
+                </button>
+              </header>
+              @if (v.wip === 'over') {
+                <p class="wip-warning" role="status">Over WIP limit: finish work before starting more.</p>
+              } @else if (v.wip === 'at') {
+                <p class="wip-warning at" role="status">At WIP limit.</p>
+              }
+            }
+            <ng-template #colMenu>
+              <div class="menu" cdkMenu>
+                <button class="menu-item" cdkMenuItem (cdkMenuItemTriggered)="editing.set(v.column.id)">Edit column and WIP limit</button>
+                <button class="menu-item" cdkMenuItem (cdkMenuItemTriggered)="addingTo.set(v.column.id)">Add card</button>
+                <div class="menu-sep" role="separator"></div>
+                <button class="menu-item" cdkMenuItem [disabled]="cfirst" (cdkMenuItemTriggered)="moveColumnBy(ci, -1)">Move column left</button>
+                <button class="menu-item" cdkMenuItem [disabled]="clast" (cdkMenuItemTriggered)="moveColumnBy(ci, 1)">Move column right</button>
+                <div class="menu-sep" role="separator"></div>
+                <button class="menu-item danger" cdkMenuItem (cdkMenuItemTriggered)="deleteColumn(v.column)">Delete column</button>
+              </div>
+            </ng-template>
+
+            <div class="cards" cdkDropList [id]="listId(null, v.column.id)" [cdkDropListData]="listData(v.column.id, null, v.visible)"
+                 [cdkDropListConnectedTo]="listIds()" (cdkDropListDropped)="dropCard($event)" role="list" [attr.aria-label]="v.column.name + ' cards'">
+              @for (c of v.visible; track c.id; let first = $first, last = $last) {
+                <app-card-tile role="listitem" cdkDrag [cdkDragData]="c.id" [card]="c" [columns]="board.columns()" [labelMap]="board.labelMap()"
+                               [memberMap]="board.memberMap()" [today]="today()" [done]="v.column.role === 'done'" [first]="first" [last]="last"
+                               (open)="openCard(c)" (moveTo)="moveTo(c, $event)" (moveBy)="moveBy(c, v.visible, $event)" (remove)="deleteCard(c)" />
+              } @empty {
+                <p class="empty">{{ ui.filterActive() && v.cards.length ? 'No matching cards' : 'Drop cards here' }}</p>
+              }
+            </div>
+
+            @if (addingTo() === v.column.id) {
+              <form class="add-form" (submit)="$event.preventDefault(); submitCard(v.column.id, title)">
+                <label class="sr-only" [for]="'add-' + v.column.id">New card title</label>
+                <input #title [id]="'add-' + v.column.id" type="text" placeholder="Card title, then Enter" appAutofocus
+                       (keydown.escape)="addingTo.set(null)" />
+                <div class="row">
+                  <button class="btn primary sm" type="submit">Add card</button>
+                  <button class="btn sm ghost" type="button" (click)="addingTo.set(null)">Done</button>
+                </div>
+              </form>
+            } @else {
+              <button class="btn ghost sm add" type="button" (click)="addingTo.set(v.column.id)">+ Add card</button>
+            }
+          </section>
+        }
+        <button class="btn add-column" type="button" (click)="addColumn()">+ Add column</button>
+      </div>
+    </div>
+  } @else {
+    <div class="board-scroll">
+      <div class="lanes" [style.--cols]="columns().length">
+        <div class="lane-head-row">
+          <div></div>
+          @for (v of columns(); track v.column.id) {
+            <div class="lane-col-head" [class.wip-at]="v.wip === 'at'" [class.wip-over]="v.wip === 'over'">
+              <strong>{{ v.column.name }}</strong>
+              <span class="count" [class.at]="v.wip === 'at'" [class.over]="v.wip === 'over'">{{ wipText(v.cards.length, v.column.wipLimit) }}</span>
+            </div>
+          }
+        </div>
+        @for (lane of lanes(); track lane.key) {
+          <div class="lane">
+            <div class="lane-title">
+              @if (lane.member; as m) { <span class="avatar" [style.background]="m.color" aria-hidden="true">{{ m.name.charAt(0) }}</span> }
+              <h2>{{ lane.title }}</h2>
+            </div>
+            @for (v of columns(); track v.column.id) {
+              @let cards = laneCards(v.visible, lane.key);
+              <div class="cards cell" cdkDropList [id]="listId(lane.key, v.column.id)" [cdkDropListData]="listData(v.column.id, lane.key, cards)"
+                   [cdkDropListConnectedTo]="listIds()" (cdkDropListDropped)="dropCard($event)" role="list"
+                   [attr.aria-label]="lane.title + ', ' + v.column.name">
+                @for (c of cards; track c.id; let first = $first, last = $last) {
+                  <app-card-tile role="listitem" cdkDrag [cdkDragData]="c.id" [card]="c" [columns]="board.columns()" [labelMap]="board.labelMap()"
+                                 [memberMap]="board.memberMap()" [today]="today()" [done]="v.column.role === 'done'" [first]="first" [last]="last"
+                                 (open)="openCard(c)" (moveTo)="moveTo(c, $event)" (moveBy)="moveBy(c, cards, $event)" (remove)="deleteCard(c)" />
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+    <p class="muted small">Drag a card into another lane to reassign it.</p>
+  }
+} @else {
+  <section class="card stack empty-board">
+    <h1>No boards yet</h1>
+    <p class="muted">Create a board to start planning, or restore the demo workspace in Settings.</p>
+    <form class="row" (submit)="$event.preventDefault(); newBoard(first.value)">
+      <label class="sr-only" for="first-board">Board name</label>
+      <input #first id="first-board" type="text" placeholder="Board name" />
+      <button class="btn primary" type="submit">Create board</button>
+    </form>
+  </section>
+}

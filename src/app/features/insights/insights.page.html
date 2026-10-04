@@ -1,0 +1,119 @@
+<div class="page">
+  <header class="row">
+    <div>
+      <h1>Insights</h1>
+      <p class="muted">Flow metrics for <strong>{{ board.board()?.name }}</strong>, computed from the activity log.</p>
+    </div>
+    <span class="spacer"></span>
+    <label class="check"><input type="checkbox" [checked]="showTables()" (change)="showTables.set(!showTables())" /> Show data tables</label>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi card"><span class="muted">Finished this week</span><strong>{{ kpis().doneThisWeek }}</strong><span class="muted small">{{ kpis().doneLastWeek }} last week</span></div>
+    <div class="kpi card"><span class="muted">Median cycle time</span><strong>{{ kpis().medianCycle }}<small> days</small></strong><span class="muted small">85% within {{ cycleStats().p85 }} days</span></div>
+    <div class="kpi card"><span class="muted">Work in progress</span><strong>{{ kpis().wip }}</strong><span class="muted small">cards in progress columns</span></div>
+    <div class="kpi card"><span class="muted">Overdue</span><strong [class.bad]="kpis().overdue">{{ kpis().overdue }}</strong><span class="muted small">open cards past due</span></div>
+  </div>
+
+  <section class="card wide">
+    <div class="row head">
+      <h2>Cumulative flow</h2>
+      <span class="spacer"></span>
+      <div class="seg" role="radiogroup" aria-label="Range">
+        @for (r of ranges; track r) {
+          <button type="button" role="radio" [attr.aria-checked]="range() === r" [class.on]="range() === r" (click)="range.set(r)">{{ r }}d</button>
+        }
+      </div>
+    </div>
+    <ul class="legend">
+      @for (s of flowSeries(); track s.name) { <li><i [style.background]="s.color"></i>{{ s.name }}</li> }
+    </ul>
+    <app-area-chart [series]="flowSeries()" [labels]="dayLabels()" label="Cumulative flow diagram: cards per column at the end of each day" />
+    <p class="muted small">Bands that widen show work piling up in that stage. Parallel bands mean a steady flow.</p>
+    @if (showTables()) {
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Day</th>@for (s of flowSeries(); track s.name) { <th>{{ s.name }}</th> }</tr></thead>
+          <tbody>
+            @for (d of dayLabels(); track $index; let i = $index) {
+              <tr><td>{{ d }}</td>@for (s of flowSeries(); track s.name) { <td>{{ s.values[i] }}</td> }</tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <div class="row head">
+        <h2>Burndown</h2>
+        <span class="spacer"></span>
+        <span class="muted small">last {{ sprintDays() }} days, story points</span>
+      </div>
+      <ul class="legend">
+        @for (s of burnSeries(); track s.name) { <li><i [style.background]="s.color" [class.dash]="s.dashed"></i>{{ s.name }}</li> }
+      </ul>
+      <app-line-chart [series]="burnSeries()" [labels]="burnLabels()" label="Burndown: remaining story points per day against the ideal line" />
+      @if (showTables()) {
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Day</th><th>Remaining</th><th>Ideal</th><th>Scope</th></tr></thead>
+            <tbody>
+              @for (d of burnLabels(); track $index; let i = $index) {
+                <tr><td>{{ d }}</td><td>{{ sprint().data.remaining[i] ?? '-' }}</td><td>{{ sprint().data.ideal[i] }}</td><td>{{ sprint().data.scope[i] }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <section class="card">
+      <div class="row head">
+        <h2>Throughput</h2>
+        <span class="spacer"></span>
+        <span class="muted small">cards finished per week</span>
+      </div>
+      <app-bar-chart [values]="weekValues()" [labels]="weekLabels()" seriesName="Cards finished" tipPrefix="Week of "
+                     color="var(--s3)" label="Throughput: cards finished per week for the last 8 weeks" />
+      @if (showTables()) {
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Week of</th><th>Finished</th></tr></thead>
+            <tbody>@for (w of throughput(); track w.week; let i = $index) { <tr><td>{{ weekLabels()[i] }}</td><td>{{ w.count }}</td></tr> }</tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </div>
+
+  <section class="card wide">
+    <div class="row head">
+      <h2>Cycle time per card</h2>
+      <span class="spacer"></span>
+      <span class="muted small">average {{ cycleStats().average }} · median {{ cycleStats().median }} · 85th percentile {{ cycleStats().p85 }} days</span>
+    </div>
+    <p class="muted small">From the first move into an in-progress column to arriving in Done.</p>
+    <div class="table-wrap">
+      <table class="cycle">
+        <thead><tr><th>Card</th><th>Started</th><th>Finished</th><th class="num">Days</th></tr></thead>
+        <tbody>
+          @for (c of cycles(); track c.cardId) {
+            <tr>
+              <td class="title">{{ c.title }}</td>
+              <td>{{ fmtDate(c.startedAt) }}</td>
+              <td>{{ fmtDate(c.finishedAt) }}</td>
+              <td class="num">
+                <span class="cbar"><span [style.width.%]="(100 * c.days) / maxCycle()"></span></span>
+                {{ c.days }}
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="muted">No finished cards yet. Move a card to a Done column to see its cycle time.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
