@@ -104,11 +104,11 @@ const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(mi
 
 export const FIBONACCI = [1, 2, 3, 5, 8, 13];
 
-/** Snap any number to the nearest allowed story-point value. */
+/** Snap any number to the nearest allowed story-point value (ties round up). */
 export function toStoryPoints(n: unknown): number {
   const value = Number(n);
   if (!Number.isFinite(value) || value <= 0) return 3;
-  return FIBONACCI.reduce((best, p) => (Math.abs(p - value) < Math.abs(best - value) ? p : best), FIBONACCI[0]);
+  return FIBONACCI.reduce((best, p) => (Math.abs(p - value) <= Math.abs(best - value) ? p : best), FIBONACCI[0]);
 }
 
 /** Rough conversion used when subtasks become cards. */

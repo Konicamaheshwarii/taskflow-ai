@@ -17,6 +17,7 @@
   --shadow-lift: 0 8px 24px rgb(16 24 40 / 18%);
   // chart series (categorical, fixed order)
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+  --label-lift: 0%;
   color-scheme: light;
 }
 
@@ -36,6 +37,7 @@
   --bad: #ff7b72;
   --shadow: none;
   --shadow-lift: 0 8px 24px rgb(0 0 0 / 45%);
+  --label-lift: 40%;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
   color-scheme: dark;
 }

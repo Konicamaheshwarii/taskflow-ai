@@ -53,7 +53,7 @@ const CHECKOUT: SeedCard[] = [
     comments: [['Dana Novak', 'Two customers reported this on Friday. Refunded both manually.'], ['Ben Ortiz', 'Root cause: missing idempotency key on retry. Fix is in review.']] },
   { title: 'Card element with 3-D Secure', labels: ['l-fe'], who: 'Chen', points: 5, priority: 'high', path: [[15, 'b'], [10.2, 'p'], [6.3, 'r'], [5.1, 'd']] },
   { title: 'Order confirmation email', labels: ['l-be'], who: 'Dana', points: 2, path: [[14, 'b'], [8.4, 'p'], [5.4, 'r'], [4.2, 'd']] },
-  { title: 'Guest checkout without an account', labels: ['l-fe'], who: 'Dana', points: 3, path: [[14, 'b'], [7.2, 'p'], [3.3, 'r'], [1.6, 'd']] },
+  { title: 'Guest checkout without an account', labels: ['l-fe'], who: 'Dana', points: 3, path: [[14, 'b'], [7.2, 'p'], [3.3, 'r'], [0.7, 'd']] },
   { title: 'Migrate legacy cart to the new API', labels: ['l-debt', 'l-be'], who: 'Ben', points: 8, path: [[16, 'b'], [9.1, 'p'], [4.3, 'r'], [2.1, 'd']],
     description: 'The old cart service still writes to the monolith database. Move reads and writes to the cart API and delete the old code path.' },
 

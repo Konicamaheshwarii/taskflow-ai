@@ -199,13 +199,20 @@ const GENERIC_SUBTASKS: [string, number][] = [
   ['Update docs and request a code review', 2],
 ];
 
-export function matchTemplates(text: string): Template[] {
-  return TEMPLATES.filter((t) => t.match.test(text));
+const hits = (t: Template, text: string) => text.match(new RegExp(t.match.source, 'gi'))?.length ?? 0;
+
+/** Templates whose keywords appear in the text, best match first (title hits count double). */
+export function matchTemplates(text: string, title = ''): Template[] {
+  return TEMPLATES
+    .map((t, order) => ({ t, order, score: hits(t, text) + 2 * hits(t, title) }))
+    .filter((m) => m.score > 0)
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .map((m) => m.t);
 }
 
 /** 4-8 subtasks for a card, chosen by keyword. */
 export function demoBreakdown({ title, description }: BreakdownInput): Subtask[] {
-  const [template] = matchTemplates(`${title}\n${description}`);
+  const [template] = matchTemplates(description, title);
   const rows = template?.subtasks ?? GENERIC_SUBTASKS;
   return rows.slice(0, 8).map(([t, h]) => ({ title: t, estimateHours: h }));
 }
@@ -221,7 +228,10 @@ export function goalItems(goal: string): string[] {
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function demoSprintPlan({ goal }: SprintInput): SprintPlan {
-  const templates = matchTemplates(goal);
+  const ranked = matchTemplates(goal);
+  const top = ranked.length ? (goal.match(new RegExp(ranked[0].match.source, 'gi'))?.length ?? 1) : 0;
+  // Keep secondary themes only when they are mentioned about as often as the main one.
+  const templates = ranked.filter((t, i) => i === 0 || (goal.match(new RegExp(t.match.source, 'gi'))?.length ?? 0) * 2 >= top);
   if (templates.length) {
     const stories: Story[] = templates.flatMap((t) => t.stories.map(([title, user, want, benefit, criteria, points, priority]) => ({
       title, description: `As a ${user}, I want ${want} so that ${benefit}.`, acceptanceCriteria: criteria, points, priority,

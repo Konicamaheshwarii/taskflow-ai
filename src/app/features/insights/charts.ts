@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, input, signal } from '@angular/core';
 
 /** Hand-written SVG charts: no chart library, so the bundle stays small and the markup stays accessible. */
 
@@ -9,28 +9,50 @@ export interface Series {
   dashed?: boolean;
 }
 
-const W = 640;
 const H = 240;
 const PAD = { top: 12, right: 12, bottom: 26, left: 34 };
-const IW = W - PAD.left - PAD.right;
 const IH = H - PAD.top - PAD.bottom;
 
+/** A round step so the axis has at most five intervals. */
+export function niceStep(v: number): number {
+  for (let pow = 1; ; pow *= 10) {
+    for (const m of [1, 2, 2.5, 5]) {
+      const step = m * pow;
+      if (Number.isInteger(step) && Math.ceil(v / step) <= 5) return step;
+    }
+  }
+}
+
 export function niceMax(v: number): number {
-  if (v <= 4) return 4;
-  const pow = 10 ** Math.floor(Math.log10(v));
-  const step = [1, 2, 2.5, 5, 10].find((s) => s * pow >= v / 4 - 1e-9)! * pow;
-  return Math.ceil(v / step) * step;
+  const step = niceStep(Math.max(v, 1));
+  return Math.max(step, Math.ceil(v / step) * step);
 }
 
 function ticks(max: number): number[] {
-  return [0, 1, 2, 3, 4].map((i) => (max * i) / 4);
+  const step = niceStep(max);
+  return Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
 }
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-/** Every nth x label so they never collide. */
-function labelEvery(count: number): number {
-  return Math.max(1, Math.ceil(count / 7));
+/** Every nth x label so they never collide (about one label per 70px). */
+function labelEvery(count: number, width: number): number {
+  return Math.max(1, Math.ceil(count / Math.max(2, Math.floor(width / 70))));
+}
+
+/** The chart's real pixel width, so the viewBox is 1:1 and text keeps its size on every screen. */
+function hostWidth() {
+  const width = signal(640);
+  const el = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      if (w > 0) width.set(Math.max(280, w));
+    });
+    ro.observe(el);
+    inject(DestroyRef).onDestroy(() => ro.disconnect());
+  }
+  return width;
 }
 
 @Component({
@@ -73,7 +95,8 @@ export class AreaChart {
   readonly labels = input.required<string[]>();
   readonly label = input('');
 
-  protected readonly W = W;
+  protected readonly width = hostWidth();
+  protected get W(): number { return this.width(); }
   protected readonly H = H;
   protected readonly PAD = PAD;
   protected readonly IH = IH;
@@ -87,9 +110,9 @@ export class AreaChart {
     return niceMax(m);
   });
   protected readonly yTicks = computed(() => ticks(this.max()));
-  protected readonly step = computed(() => IW / Math.max(1, this.labels().length - 1));
+  protected readonly step = computed(() => (this.width() - PAD.left - PAD.right) / Math.max(1, this.labels().length - 1));
   protected readonly xLabels = computed(() => {
-    const every = labelEvery(this.labels().length);
+    const every = labelEvery(this.labels().length, this.width());
     return this.labels().map((text, i) => ({ i, text })).filter((l) => l.i % every === 0);
   });
 
@@ -157,7 +180,8 @@ export class LineChart {
   readonly labels = input.required<string[]>();
   readonly label = input('');
 
-  protected readonly W = W;
+  protected readonly width = hostWidth();
+  protected get W(): number { return this.width(); }
   protected readonly H = H;
   protected readonly PAD = PAD;
   protected readonly IH = IH;
@@ -166,9 +190,9 @@ export class LineChart {
 
   protected readonly max = computed(() => niceMax(Math.max(0, ...this.series().flatMap((s) => s.values.map((v) => v ?? 0)))));
   protected readonly yTicks = computed(() => ticks(this.max()));
-  protected readonly step = computed(() => IW / Math.max(1, this.labels().length - 1));
+  protected readonly step = computed(() => (this.width() - PAD.left - PAD.right) / Math.max(1, this.labels().length - 1));
   protected readonly xLabels = computed(() => {
-    const every = labelEvery(this.labels().length);
+    const every = labelEvery(this.labels().length, this.width());
     return this.labels().map((text, i) => ({ i, text })).filter((l) => l.i % every === 0);
   });
 
@@ -203,7 +227,7 @@ export class LineChart {
         @for (b of bars(); track b.i) {
           <path [attr.d]="b.d" [attr.fill]="color()" class="bar" [class.dim]="hover() !== null && hover() !== b.i" />
           @if (b.value > 0) { <text class="value" [attr.x]="b.cx" [attr.y]="b.top - 5" text-anchor="middle">{{ b.value }}</text> }
-          <text class="axis" [attr.x]="b.cx" [attr.y]="H - 8" text-anchor="middle">{{ labels()[b.i] }}</text>
+          @if (b.i % every() === 0) { <text class="axis" [attr.x]="b.cx" [attr.y]="H - 8" text-anchor="middle">{{ labels()[b.i] }}</text> }
           <rect class="hit" [attr.x]="b.cx - slot() / 2" [attr.y]="PAD.top" [attr.width]="slot()" [attr.height]="IH" (mouseenter)="hover.set(b.i)" />
         }
       </svg>
@@ -225,7 +249,8 @@ export class BarChart {
   readonly tipPrefix = input('');
   readonly label = input('');
 
-  protected readonly W = W;
+  protected readonly width = hostWidth();
+  protected get W(): number { return this.width(); }
   protected readonly H = H;
   protected readonly PAD = PAD;
   protected readonly IH = IH;
@@ -234,7 +259,8 @@ export class BarChart {
 
   protected readonly max = computed(() => niceMax(Math.max(0, ...this.values())));
   protected readonly yTicks = computed(() => ticks(this.max()));
-  protected readonly slot = computed(() => IW / Math.max(1, this.values().length));
+  protected readonly every = computed(() => labelEvery(this.values().length, this.width() * 0.9));
+  protected readonly slot = computed(() => (this.width() - PAD.left - PAD.right) / Math.max(1, this.values().length));
 
   protected y(v: number): number {
     return PAD.top + IH - (v / this.max()) * IH;
